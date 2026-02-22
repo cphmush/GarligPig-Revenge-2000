@@ -21,6 +21,7 @@ export interface Player extends Entity {
   hp: number;
   maxHp: number;
   ammo: number;
+  carrotBombs: number;
   isJumping: boolean;
   facing: 'left' | 'right';
   lastShot: number;
@@ -37,6 +38,7 @@ export interface Enemy extends Entity {
 export interface Bullet extends Entity {
   owner: 'player' | 'enemy';
   damage: number;
+  type: 'normal' | 'carrot';
 }
 
 export interface Platform extends Entity {
@@ -46,7 +48,7 @@ export interface Platform extends Entity {
 }
 
 export interface PowerUp extends Entity {
-  type: 'health' | 'ammo' | 'shield' | 'garlic';
+  type: 'health' | 'ammo' | 'shield' | 'garlic' | 'carrot';
   collected: boolean;
 }
 
