@@ -33,7 +33,8 @@ export const Game: React.FC<GameProps> = ({ onGameOver, onWin }) => {
     carrotBombs: 0,
     isJumping: false,
     facing: 'right',
-    lastShot: 0
+    lastShot: 0,
+    character: 'pig'
   });
 
   const keysRef = useRef<{ [key: string]: boolean }>({});
@@ -76,6 +77,18 @@ export const Game: React.FC<GameProps> = ({ onGameOver, onWin }) => {
           vy: 0,
           type: 'mystery-block',
           hasItem: true
+        });
+      }
+      if (i % 5 === 0) {
+        platforms.push({
+          id: `s${i}`,
+          x: 800 + i * 300,
+          y: 400,
+          width: 40,
+          height: 40,
+          vx: 0,
+          vy: 0,
+          type: 'switch-box'
         });
       }
     }
@@ -162,7 +175,7 @@ export const Game: React.FC<GameProps> = ({ onGameOver, onWin }) => {
       if ((keysRef.current['ArrowUp'] || keysRef.current['KeyW'] || keysRef.current['Space']) && !player.isJumping) {
         player.vy = JUMP_FORCE;
         player.isJumping = true;
-        soundEngine.playJump();
+        soundEngine.playJump(player.character === 'horse');
         
         // Jump particles
         for (let i = 0; i < 5; i++) {
@@ -231,37 +244,52 @@ export const Game: React.FC<GameProps> = ({ onGameOver, onWin }) => {
           player.isJumping = false;
           onPlatform = true;
         }
-        // Collision from bottom (Mystery Block)
+        // Collision from bottom (Mystery Block or Switch Box)
         if (
-          p.type === 'mystery-block' && !p.isHit &&
+          (p.type === 'mystery-block' || p.type === 'switch-box') &&
           player.x < p.x + p.width &&
           player.x + player.width > p.x &&
           player.y < p.y + p.height &&
           player.y > p.y + player.vy
         ) {
-          p.isHit = true;
           player.vy = 2; // Bounce back
           soundEngine.playHit();
-          
-          // Spawn PowerUp
-          const rand = Math.random();
-          let type: PowerUp['type'] = 'garlic';
-          if (rand < 0.15) type = 'health';
-          else if (rand < 0.3) type = 'ammo';
-          else if (rand < 0.4) type = 'shield';
-          else if (rand < 0.5) type = 'carrot';
-          
-          powerUpsRef.current.push({
-            id: Math.random().toString(),
-            x: p.x,
-            y: p.y - 40,
-            width: 30,
-            height: 30,
-            vx: 0,
-            vy: -2,
-            type,
-            collected: false
-          });
+
+          if (p.type === 'mystery-block' && !p.isHit) {
+            p.isHit = true;
+            // Spawn PowerUp
+            const rand = Math.random();
+            let type: PowerUp['type'] = 'garlic';
+            if (rand < 0.15) type = 'health';
+            else if (rand < 0.3) type = 'ammo';
+            else if (rand < 0.4) type = 'shield';
+            else if (rand < 0.5) type = 'carrot';
+            
+            powerUpsRef.current.push({
+              id: Math.random().toString(),
+              x: p.x,
+              y: p.y - 40,
+              width: 30,
+              height: 30,
+              vx: 0,
+              vy: -2,
+              type,
+              collected: false
+            });
+          } else if (p.type === 'switch-box') {
+            player.character = player.character === 'pig' ? 'horse' : 'pig';
+            // Visual feedback for switch
+            for (let i = 0; i < 10; i++) {
+              particlesRef.current.push({
+                x: player.x + player.width / 2,
+                y: player.y + player.height / 2,
+                vx: (Math.random() - 0.5) * 10,
+                vy: (Math.random() - 0.5) * 10,
+                life: 1.0,
+                color: COLORS.SWITCH_BOX
+              });
+            }
+          }
         }
       });
       if (!onPlatform && player.y < CANVAS_HEIGHT) {
@@ -424,36 +452,61 @@ export const Game: React.FC<GameProps> = ({ onGameOver, onWin }) => {
     const draw = () => {
       ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
       
-      // Amiga-style Copper Sky
+      // Amiga-style Copper Sky (Farm theme)
       const gradient = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
       gradient.addColorStop(0, COLORS.SKY_TOP);
-      gradient.addColorStop(0.5, COLORS.SKY_BOTTOM);
-      gradient.addColorStop(1, '#000000');
+      gradient.addColorStop(0.6, COLORS.SKY_BOTTOM);
+      gradient.addColorStop(1, '#ffffff');
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-      // Parallax Layer 1: Stars/Far Space (Slowest)
-      ctx.fillStyle = 'white';
-      for (let i = 0; i < 50; i++) {
-        const x = (i * 234 + cameraXRef.current * -0.1) % CANVAS_WIDTH;
-        const y = (i * 123) % CANVAS_HEIGHT;
-        ctx.fillRect(x, y, 2, 2);
+      // Dithering Effect Helper
+      const drawDitheredRect = (x: number, y: number, w: number, h: number, color1: string, color2: string) => {
+        ctx.fillStyle = color1;
+        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = color2;
+        for (let dy = 0; dy < h; dy += 2) {
+          for (let dx = (dy % 4 === 0 ? 0 : 2); dx < w; dx += 4) {
+            ctx.fillRect(x + dx, y + dy, 2, 2);
+          }
+        }
+      };
+
+      // Parallax Layer 1: Distant Clouds (Slowest)
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      for (let i = 0; i < 10; i++) {
+        const x = (i * 400 + cameraXRef.current * -0.1) % (CANVAS_WIDTH + 200) - 100;
+        const y = 100 + (i * 50) % 150;
+        ctx.beginPath();
+        ctx.arc(x, y, 30, 0, Math.PI * 2);
+        ctx.arc(x + 20, y - 10, 25, 0, Math.PI * 2);
+        ctx.arc(x + 40, y, 30, 0, Math.PI * 2);
+        ctx.fill();
       }
 
-      // Parallax Layer 2: Cyberpunk Buildings
+      // Parallax Layer 2: Farm Houses/Hills
       ctx.save();
       ctx.translate(-cameraXRef.current * 0.3, 0);
-      for (let i = 0; i < 15; i++) {
-        ctx.fillStyle = '#0f172a';
-        const bh = 200 + Math.random() * 300;
-        const bw = 100 + Math.random() * 100;
-        ctx.fillRect(i * 400, CANVAS_HEIGHT - bh, bw, bh);
-        // Neon Windows
-        ctx.fillStyle = i % 2 === 0 ? COLORS.NEON_PINK : COLORS.NEON_CYAN;
-        for (let wy = 0; wy < bh - 40; wy += 40) {
-          if (Math.random() > 0.3) ctx.fillRect(i * 400 + 10, CANVAS_HEIGHT - bh + 20 + wy, 10, 10);
-          if (Math.random() > 0.3) ctx.fillRect(i * 400 + bw - 20, CANVAS_HEIGHT - bh + 20 + wy, 10, 10);
-        }
+      for (let i = 0; i < 8; i++) {
+        const bx = i * 600;
+        // Hills
+        ctx.fillStyle = '#166534';
+        ctx.beginPath();
+        ctx.ellipse(bx + 300, 550, 400, 150, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Farm House
+        ctx.fillStyle = COLORS.FARM_HOUSE;
+        ctx.fillRect(bx + 100, 400, 120, 150);
+        ctx.fillStyle = COLORS.FARM_ROOF;
+        ctx.beginPath();
+        ctx.moveTo(bx + 80, 400);
+        ctx.lineTo(bx + 160, 320);
+        ctx.lineTo(bx + 240, 400);
+        ctx.fill();
+        
+        // Dithering on house
+        drawDitheredRect(bx + 110, 410, 100, 130, COLORS.FARM_HOUSE, 'rgba(0,0,0,0.1)');
       }
       ctx.restore();
 
@@ -462,39 +515,30 @@ export const Game: React.FC<GameProps> = ({ onGameOver, onWin }) => {
 
       // Platforms
       platformsRef.current.forEach(p => {
-        if (p.type === 'mystery-block') {
-          ctx.fillStyle = p.isHit ? COLORS.MYSTERY_BLOCK_HIT : COLORS.MYSTERY_BLOCK;
+        if (p.type === 'mystery-block' || p.type === 'switch-box') {
+          ctx.fillStyle = p.type === 'switch-box' ? COLORS.SWITCH_BOX : (p.isHit ? COLORS.MYSTERY_BLOCK_HIT : COLORS.MYSTERY_BLOCK);
           ctx.fillRect(p.x, p.y, p.width, p.height);
-          ctx.strokeStyle = COLORS.NEON_CYAN;
+          ctx.strokeStyle = 'black';
           ctx.lineWidth = 2;
           ctx.strokeRect(p.x, p.y, p.width, p.height);
           
-          if (!p.isHit) {
-            ctx.fillStyle = COLORS.NEON_CYAN;
-            ctx.font = 'bold 20px monospace';
-            ctx.fillText('?', p.x + 15, p.y + 28);
-          }
+          ctx.fillStyle = 'white';
+          ctx.font = 'bold 20px monospace';
+          ctx.fillText(p.type === 'switch-box' ? 'S' : '?', p.x + 12, p.y + 28);
+          
+          // Dithered highlights
+          drawDitheredRect(p.x + 2, p.y + 2, p.width - 4, 10, 'rgba(255,255,255,0.2)', 'transparent');
         } else {
-          // Metal Arcade Ground
+          // Farm Ground
           ctx.fillStyle = COLORS.GROUND;
           ctx.fillRect(p.x, p.y, p.width, p.height);
-          ctx.strokeStyle = COLORS.GROUND_ACCENT;
-          ctx.lineWidth = 2;
-          ctx.strokeRect(p.x, p.y, p.width, p.height);
           
-          // Rivets
-          ctx.fillStyle = '#18181b';
-          ctx.fillRect(p.x + 5, p.y + 5, 4, 4);
-          ctx.fillRect(p.x + p.width - 9, p.y + 5, 4, 4);
-          ctx.fillRect(p.x + 5, p.y + p.height - 9, 4, 4);
-          ctx.fillRect(p.x + p.width - 9, p.y + p.height - 9, 4, 4);
-
-          // Green Pipes (from cover art)
-          if (p.type === 'ground' && p.x % 1000 === 0) {
-            ctx.fillStyle = COLORS.PIPE;
-            ctx.fillRect(p.x + 200, p.y + p.height, 40, 100);
-            ctx.fillRect(p.x + 180, p.y + p.height + 20, 80, 20);
-          }
+          // Grass top
+          ctx.fillStyle = '#15803d';
+          ctx.fillRect(p.x, p.y, p.width, 10);
+          
+          // Dithering on ground
+          drawDitheredRect(p.x, p.y + 10, p.width, p.height - 10, COLORS.GROUND, COLORS.GROUND_ACCENT);
         }
       });
 
@@ -642,95 +686,138 @@ export const Game: React.FC<GameProps> = ({ onGameOver, onWin }) => {
         ctx.shadowBlur = 0;
       });
 
-      // Player (GarlicPig)
+      // Player (GarlicPig or GarlicHorse)
       const player = playerRef.current;
       
-      // Muscular Arms (from cover art)
-      ctx.fillStyle = COLORS.PIG;
-      const armX = player.facing === 'right' ? player.x - 5 : player.x + 25;
-      ctx.beginPath();
-      ctx.ellipse(armX + 10, player.y + 25, 12, 8, 0.5, 0, Math.PI * 2);
-      ctx.fill();
-      
-      // Tattoo on arm
-      ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(armX + 5, player.y + 25);
-      ctx.lineTo(armX + 15, player.y + 25);
-      ctx.stroke();
+      if (player.character === 'horse') {
+        // Garlic Horse (Running on hind legs)
+        ctx.fillStyle = COLORS.HORSE_DARK;
+        ctx.beginPath();
+        // Body
+        ctx.ellipse(player.x + 20, player.y + 20, 15, 25, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = COLORS.HORSE;
+        ctx.beginPath();
+        ctx.ellipse(player.x + 20, player.y + 20, 13, 23, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Horse Head
+        ctx.fillStyle = COLORS.HORSE;
+        const headX = player.facing === 'right' ? player.x + 25 : player.x - 5;
+        ctx.fillRect(headX, player.y - 10, 20, 15);
+        ctx.fillStyle = 'black';
+        ctx.fillRect(headX + (player.facing === 'right' ? 12 : 4), player.y - 5, 4, 4);
+        
+        // Mane
+        ctx.fillStyle = '#451a03';
+        ctx.fillRect(player.x + 15, player.y - 15, 10, 20);
+        
+        // Garlic on head
+        ctx.fillStyle = COLORS.GARLIC;
+        ctx.beginPath();
+        ctx.moveTo(player.x + 20, player.y - 25);
+        ctx.quadraticCurveTo(player.x + 10, player.y - 15, player.x + 20, player.y - 5);
+        ctx.quadraticCurveTo(player.x + 30, player.y - 15, player.x + 20, player.y - 25);
+        ctx.fill();
 
-      // Body
-      ctx.fillStyle = COLORS.PIG_DARK;
-      ctx.beginPath();
-      ctx.ellipse(player.x + 20, player.y + 20, 20, 18, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = COLORS.PIG;
-      ctx.beginPath();
-      ctx.ellipse(player.x + 20, player.y + 20, 18, 16, 0, 0, Math.PI * 2);
-      ctx.fill();
-      
-      // Green Military Vest
-      ctx.fillStyle = COLORS.VEST;
-      ctx.fillRect(player.x + 5, player.y + 10, 30, 20);
-      ctx.strokeStyle = '#1a2e05';
-      ctx.strokeRect(player.x + 5, player.y + 10, 30, 20);
-      
-      // Curly Tail
-      ctx.strokeStyle = COLORS.PIG_DARK;
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      const tailX = player.facing === 'right' ? player.x : player.x + 40;
-      ctx.moveTo(tailX, player.y + 20);
-      ctx.quadraticCurveTo(tailX - (player.facing === 'right' ? 10 : -10), player.y + 10, tailX, player.y);
-      ctx.stroke();
+        // Gun
+        ctx.fillStyle = '#222';
+        const gunX_horse = player.facing === 'right' ? player.x + 20 : player.x - 20;
+        ctx.fillRect(gunX_horse, player.y + 10, 40, 10);
+      } else {
+        // Muscular Arms (from cover art)
+        ctx.fillStyle = COLORS.PIG;
+        const armX = player.facing === 'right' ? player.x - 5 : player.x + 25;
+        ctx.beginPath();
+        ctx.ellipse(armX + 10, player.y + 25, 12, 8, 0.5, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Tattoo on arm
+        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(armX + 5, player.y + 25);
+        ctx.lineTo(armX + 15, player.y + 25);
+        ctx.stroke();
 
-      // Snout
-      ctx.fillStyle = '#ffb6c1';
-      const snoutX = player.facing === 'right' ? player.x + 30 : player.x - 5;
-      ctx.beginPath();
-      ctx.ellipse(snoutX + 7, player.y + 25, 8, 6, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = 'black';
-      ctx.fillRect(snoutX + 4, player.y + 23, 2, 2);
-      ctx.fillRect(snoutX + 8, player.y + 23, 2, 2);
-      
-      // Military Helmet with Garlic Bulb (from cover art)
-      ctx.fillStyle = COLORS.HELMET;
-      ctx.beginPath();
-      ctx.arc(player.x + 20, player.y + 5, 22, Math.PI, 0);
-      ctx.fill();
-      
-      // Garlic Bulb on top
-      ctx.fillStyle = COLORS.GARLIC;
-      ctx.beginPath();
-      ctx.moveTo(player.x + 20, player.y - 15);
-      ctx.quadraticCurveTo(player.x + 10, player.y - 5, player.x + 20, player.y + 5);
-      ctx.quadraticCurveTo(player.x + 30, player.y - 5, player.x + 20, player.y - 15);
-      ctx.fill();
-      ctx.fillStyle = '#4ade80'; // Green leaf on garlic
-      ctx.fillRect(player.x + 18, player.y - 18, 4, 4);
-      
-      // Eyes (Angry)
-      ctx.fillStyle = 'black';
-      const eyeX = player.facing === 'right' ? player.x + 25 : player.x + 10;
-      ctx.fillRect(eyeX, player.y + 12, 6, 6);
-      ctx.strokeStyle = 'black';
-      ctx.beginPath();
-      ctx.moveTo(eyeX - 2, player.y + 10);
-      ctx.lineTo(eyeX + 8, player.y + 14);
-      ctx.stroke();
+        // Body
+        ctx.fillStyle = COLORS.PIG_DARK;
+        ctx.beginPath();
+        ctx.ellipse(player.x + 20, player.y + 20, 20, 18, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = COLORS.PIG;
+        ctx.beginPath();
+        ctx.ellipse(player.x + 20, player.y + 20, 18, 16, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Green Military Vest
+        ctx.fillStyle = COLORS.VEST;
+        ctx.fillRect(player.x + 5, player.y + 10, 30, 20);
+        ctx.strokeStyle = '#1a2e05';
+        ctx.strokeRect(player.x + 5, player.y + 10, 30, 20);
+        
+        // Curly Tail
+        ctx.strokeStyle = COLORS.PIG_DARK;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        const tailX = player.facing === 'right' ? player.x : player.x + 40;
+        ctx.moveTo(tailX, player.y + 20);
+        ctx.quadraticCurveTo(tailX - (player.facing === 'right' ? 10 : -10), player.y + 10, tailX, player.y);
+        ctx.stroke();
 
-      // Machine Gun (Detailed)
-      ctx.fillStyle = '#222';
-      const gunX = player.facing === 'right' ? player.x + 20 : player.x - 20;
-      ctx.fillRect(gunX, player.y + 22, 40, 12);
-      ctx.fillStyle = '#444';
-      ctx.fillRect(gunX + (player.facing === 'right' ? 30 : 0), player.y + 24, 10, 8); // Barrel
-      ctx.fillStyle = '#111';
-      ctx.fillRect(gunX + 10, player.y + 30, 15, 10); // Magazine
-      
+        // Snout
+        ctx.fillStyle = '#ffb6c1';
+        const snoutX = player.facing === 'right' ? player.x + 30 : player.x - 5;
+        ctx.beginPath();
+        ctx.ellipse(snoutX + 7, player.y + 25, 8, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'black';
+        ctx.fillRect(snoutX + 4, player.y + 23, 2, 2);
+        ctx.fillRect(snoutX + 8, player.y + 23, 2, 2);
+        
+        // Military Helmet with Garlic Bulb (from cover art)
+        ctx.fillStyle = COLORS.HELMET;
+        ctx.beginPath();
+        ctx.arc(player.x + 20, player.y + 5, 22, Math.PI, 0);
+        ctx.fill();
+        
+        // Garlic Bulb on top
+        ctx.fillStyle = COLORS.GARLIC;
+        ctx.beginPath();
+        ctx.moveTo(player.x + 20, player.y - 15);
+        ctx.quadraticCurveTo(player.x + 10, player.y - 5, player.x + 20, player.y + 5);
+        ctx.quadraticCurveTo(player.x + 30, player.y - 5, player.x + 20, player.y - 15);
+        ctx.fill();
+        ctx.fillStyle = '#4ade80'; // Green leaf on garlic
+        ctx.fillRect(player.x + 18, player.y - 18, 4, 4);
+        
+        // Eyes (Angry)
+        ctx.fillStyle = 'black';
+        const eyeX_pig = player.facing === 'right' ? player.x + 25 : player.x + 10;
+        ctx.fillRect(eyeX_pig, player.y + 12, 6, 6);
+        ctx.strokeStyle = 'black';
+        ctx.beginPath();
+        ctx.moveTo(eyeX_pig - 2, player.y + 10);
+        ctx.lineTo(eyeX_pig + 8, player.y + 14);
+        ctx.stroke();
+
+        // Machine Gun (Detailed)
+        ctx.fillStyle = '#222';
+        const gunX_pig = player.facing === 'right' ? player.x + 20 : player.x - 20;
+        ctx.fillRect(gunX_pig, player.y + 22, 40, 12);
+        ctx.fillStyle = '#444';
+        ctx.fillRect(gunX_pig + (player.facing === 'right' ? 30 : 0), player.y + 24, 10, 8); // Barrel
+        ctx.fillStyle = '#111';
+        ctx.fillRect(gunX_pig + 10, player.y + 30, 15, 10); // Magazine
+      }
+
       ctx.restore();
+
+      // Scanlines Emulation
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+      for (let i = 0; i < CANVAS_HEIGHT; i += 4) {
+        ctx.fillRect(0, i, CANVAS_WIDTH, 2);
+      }
     };
 
     const loop = () => {

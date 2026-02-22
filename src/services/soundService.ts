@@ -31,8 +31,14 @@ class SoundEngine {
     osc.stop(this.ctx.currentTime + duration);
   }
 
-  playJump() {
-    this.playTone(150, 'square', 0.2, 0.1, 400);
+  playJump(isHorse?: boolean) {
+    if (isHorse) {
+      // Horse neigh-like jump sound
+      this.playTone(400, 'sawtooth', 0.3, 0.1, 600);
+      this.playTone(500, 'sawtooth', 0.1, 0.05, 300);
+    } else {
+      this.playTone(150, 'square', 0.2, 0.1, 400);
+    }
   }
 
   playShoot() {

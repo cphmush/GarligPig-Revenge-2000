@@ -25,6 +25,7 @@ export interface Player extends Entity {
   isJumping: boolean;
   facing: 'left' | 'right';
   lastShot: number;
+  character: 'pig' | 'horse';
 }
 
 export interface Enemy extends Entity {
@@ -42,7 +43,7 @@ export interface Bullet extends Entity {
 }
 
 export interface Platform extends Entity {
-  type: 'ground' | 'floating' | 'mystery-block';
+  type: 'ground' | 'floating' | 'mystery-block' | 'switch-box';
   hasItem?: boolean;
   isHit?: boolean;
 }
