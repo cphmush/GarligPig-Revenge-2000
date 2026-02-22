@@ -45,6 +45,8 @@ export const Game: React.FC<GameProps> = ({ onGameOver, onWin }) => {
   const particlesRef = useRef<{x: number, y: number, vx: number, vy: number, life: number, color: string}[]>([]);
   const cameraXRef = useRef(0);
   const levelWidthRef = useRef(5000);
+  const hitStopRef = useRef(0);
+  const shakeRef = useRef(0);
 
   const loadLevel = (levelNum: number) => {
     levelWidthRef.current = 5000 + (levelNum * 1000);
@@ -159,6 +161,15 @@ export const Game: React.FC<GameProps> = ({ onGameOver, onWin }) => {
     let animationFrameId: number;
 
     const update = () => {
+      if (hitStopRef.current > 0) {
+        hitStopRef.current--;
+        return;
+      }
+      if (shakeRef.current > 0) {
+        shakeRef.current *= 0.9;
+        if (shakeRef.current < 0.1) shakeRef.current = 0;
+      }
+
       const player = playerRef.current;
       if (gameState !== GameState.PLAYING) return;
 
@@ -354,9 +365,12 @@ export const Game: React.FC<GameProps> = ({ onGameOver, onWin }) => {
               e.hp -= b.damage;
               hit = true;
               soundEngine.playHit();
+              hitStopRef.current = 5; // Hit stop effect
+              shakeRef.current = 5; // Small shake on hit
               if (e.hp <= 0) {
                 setScore(prev => prev + (e.type === 'boss' ? 1000 : 100));
                 soundEngine.playExplosion();
+                shakeRef.current = 15; // Bigger shake on kill
                 // Explosion particles
                 for (let i = 0; i < 15; i++) {
                   particlesRef.current.push({
@@ -381,6 +395,7 @@ export const Game: React.FC<GameProps> = ({ onGameOver, onWin }) => {
             player.hp -= b.damage;
             hit = true;
             soundEngine.playHit();
+            shakeRef.current = 10; // Shake when player hit
             if (player.hp <= 0) {
               setGameState(GameState.GAME_OVER);
               onGameOver(score);
@@ -408,7 +423,14 @@ export const Game: React.FC<GameProps> = ({ onGameOver, onWin }) => {
 
         if (e.type === 'boss') {
           e.y += Math.sin(now / 500) * 2;
-          if (now - (e.lastShot || 0) > 1000) {
+          const timeSinceLastShot = now - (e.lastShot || 0);
+          
+          // Telegraphing: Boss glows red before shooting
+          if (timeSinceLastShot > 700 && timeSinceLastShot < 1000) {
+            // Telegraphing visual handled in draw
+          }
+
+          if (timeSinceLastShot > 1000) {
             bulletsRef.current.push({
               id: Math.random().toString(),
               x: e.x,
@@ -426,6 +448,28 @@ export const Game: React.FC<GameProps> = ({ onGameOver, onWin }) => {
         } else {
           e.x += e.vx;
           if (Math.random() < 0.01) e.vx *= -1;
+          
+          // Minion shooting logic
+          const timeSinceLastShot = now - (e.lastShot || 0);
+          if (timeSinceLastShot > 3000 && Math.abs(e.x - player.x) < 400) {
+            // Telegraphing: small pause before shooting
+            if (timeSinceLastShot > 3500) {
+              bulletsRef.current.push({
+                id: Math.random().toString(),
+                x: e.vx > 0 ? e.x + e.width : e.x,
+                y: e.y + e.height / 2,
+                width: 8,
+                height: 3,
+                vx: e.vx > 0 ? 5 : -5,
+                vy: 0,
+                damage: 5,
+                owner: 'enemy',
+                type: 'normal'
+              });
+              e.lastShot = now;
+              soundEngine.playShoot();
+            }
+          }
         }
 
         if (
@@ -452,6 +496,13 @@ export const Game: React.FC<GameProps> = ({ onGameOver, onWin }) => {
     const draw = () => {
       ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
       
+      ctx.save();
+      if (shakeRef.current > 0) {
+        const sx = (Math.random() - 0.5) * shakeRef.current;
+        const sy = (Math.random() - 0.5) * shakeRef.current;
+        ctx.translate(sx, sy);
+      }
+
       // Amiga-style Copper Sky (Farm theme)
       const gradient = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
       gradient.addColorStop(0, COLORS.SKY_TOP);
@@ -592,7 +643,14 @@ export const Game: React.FC<GameProps> = ({ onGameOver, onWin }) => {
       enemiesRef.current.forEach(e => {
         if (e.type === 'boss') {
           // Mechanical Pig Ship (from cover art)
-          ctx.fillStyle = COLORS.BOSS_METAL;
+          const timeSinceLastShot = Date.now() - (e.lastShot || 0);
+          const isTelegraphing = timeSinceLastShot > 700 && timeSinceLastShot < 1000;
+
+          ctx.fillStyle = isTelegraphing ? '#ff4444' : COLORS.BOSS_METAL;
+          if (isTelegraphing) {
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = '#ff0000';
+          }
           ctx.beginPath();
           ctx.ellipse(e.x + 60, e.y + 60, 60, 50, 0, 0, Math.PI * 2);
           ctx.fill();
@@ -617,6 +675,17 @@ export const Game: React.FC<GameProps> = ({ onGameOver, onWin }) => {
           ctx.fill();
         } else {
           // Detailed Minions (from cover art)
+          const timeSinceLastShot = Date.now() - (e.lastShot || 0);
+          const isTelegraphing = timeSinceLastShot > 3000 && timeSinceLastShot < 3500;
+
+          if (isTelegraphing) {
+            ctx.fillStyle = 'red';
+            ctx.font = 'bold 20px Arial';
+            ctx.fillText('!', e.x + 15, e.y - 10);
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = 'red';
+          }
+
           if (e.type === 'guinea-pig') {
             // Space Suit Guinea Pig
             ctx.fillStyle = COLORS.GUINEA_PIG_SUIT;
@@ -659,6 +728,7 @@ export const Game: React.FC<GameProps> = ({ onGameOver, onWin }) => {
           ctx.fillStyle = '#333';
           const gunX = e.vx > 0 ? e.x + 25 : e.x - 5;
           ctx.fillRect(gunX, e.y + 25, 15, 6);
+          ctx.shadowBlur = 0;
         }
         
         // Enemy HP bar
@@ -818,6 +888,7 @@ export const Game: React.FC<GameProps> = ({ onGameOver, onWin }) => {
       for (let i = 0; i < CANVAS_HEIGHT; i += 4) {
         ctx.fillRect(0, i, CANVAS_WIDTH, 2);
       }
+      ctx.restore();
     };
 
     const loop = () => {
@@ -863,7 +934,7 @@ export const Game: React.FC<GameProps> = ({ onGameOver, onWin }) => {
         </div>
 
         <div className="absolute bottom-4 left-4 text-[10px] font-black font-mono text-white/40 bg-black/40 p-2 rounded italic uppercase tracking-widest">
-          SYSTEM: AMIGA 1200 EMULATION ACTIVE | GP-2000 REV.2
+          SYSTEM: NOAHS MAGICAL COMPUTER SIMULATOR| GP-2000 REV.2
         </div>
       </div>
     </div>

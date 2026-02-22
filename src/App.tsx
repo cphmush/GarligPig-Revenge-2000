@@ -26,48 +26,93 @@ export default function App() {
         {gameState === GameState.MENU && (
           <motion.div 
             key="menu"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.1 }}
-            className="w-full h-full flex flex-col items-center justify-center p-8 text-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="relative w-full h-full flex flex-col items-center justify-center p-8 text-center overflow-hidden bg-black"
           >
-            <motion.div
-              animate={{ y: [0, -20, 0] }}
-              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-              className="mb-12"
-            >
-              <h1 className="text-7xl md:text-9xl font-black tracking-tighter uppercase italic text-emerald-500 drop-shadow-[0_0_30px_rgba(16,185,129,0.3)]">
-                GarlicPig
-              </h1>
-              <h2 className="text-3xl md:text-5xl font-mono font-bold text-zinc-400 -mt-4">
-                REVENGE 2000
-              </h2>
-            </motion.div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl w-full mb-12">
-              <div className="bg-zinc-900/50 p-6 rounded-2xl border border-zinc-800">
-                <Shield className="w-8 h-8 text-emerald-500 mb-4 mx-auto" />
-                <h3 className="text-lg font-bold mb-2">THE MISSION</h3>
-                <p className="text-sm text-zinc-500">Infiltrate the rodent base and eliminate the space guinea pig threat.</p>
-              </div>
-              <div className="bg-zinc-900/50 p-6 rounded-2xl border border-zinc-800">
-                <Target className="w-8 h-8 text-emerald-500 mb-4 mx-auto" />
-                <h3 className="text-lg font-bold mb-2">THE ENEMIES</h3>
-                <p className="text-sm text-zinc-500">Watch out for mutated rabbits and the ultimate Cyber-Hamster boss.</p>
-              </div>
-              <div className="bg-zinc-900/50 p-6 rounded-2xl border border-zinc-800">
-                <Play className="w-8 h-8 text-emerald-500 mb-4 mx-auto" />
-                <h3 className="text-lg font-bold mb-2">CONTROLS</h3>
-                <p className="text-sm text-zinc-500">WASD to move, SPACE to jump, F to fire your machine gun.</p>
-              </div>
+            {/* Space Background */}
+            <div className="absolute inset-0 z-0 overflow-hidden">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-indigo-950/20 via-zinc-950 to-black" />
+              {[...Array(50)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: Math.random() }}
+                  animate={{ opacity: [0.2, 1, 0.2] }}
+                  transition={{ duration: 2 + Math.random() * 3, repeat: Infinity }}
+                  className="absolute w-1 h-1 bg-white rounded-full"
+                  style={{
+                    top: `${Math.random() * 100}%`,
+                    left: `${Math.random() * 100}%`,
+                  }}
+                />
+              ))}
+              <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/10 blur-[120px] rounded-full" />
+              <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-600/10 blur-[120px] rounded-full" />
             </div>
 
-            <button
-              onClick={startGame}
-              className="group relative px-12 py-6 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full text-2xl font-black uppercase tracking-widest transition-all hover:scale-105 active:scale-95 shadow-[0_0_40px_rgba(16,185,129,0.4)]"
+            <motion.div
+              initial={{ y: 50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ duration: 1, ease: "easeOut" }}
+              className="relative z-10 mb-12"
             >
-              Start Operation
-            </button>
+              <div className="relative inline-block">
+                <h1 className="text-8xl md:text-[12rem] font-black tracking-tighter uppercase italic leading-none select-none
+                  bg-gradient-to-b from-zinc-100 via-zinc-400 to-zinc-600 bg-clip-text text-transparent
+                  drop-shadow-[0_10px_10px_rgba(0,0,0,0.8)] border-b-8 border-red-600/50">
+                  GarlicPig
+                </h1>
+                {/* Drip Effect */}
+                <div className="absolute -bottom-8 left-1/4 w-4 h-12 bg-red-600 rounded-full blur-[1px] animate-bounce" />
+                <div className="absolute -bottom-4 left-1/2 w-3 h-8 bg-red-600 rounded-full blur-[1px]" />
+              </div>
+              
+              <div className="flex items-center justify-center gap-4 mt-2">
+                <h2 className="text-4xl md:text-6xl font-black text-zinc-300 uppercase italic tracking-widest drop-shadow-lg">
+                  REVENGE
+                </h2>
+                <h2 className="text-5xl md:text-7xl font-black text-emerald-400 uppercase italic tracking-tighter drop-shadow-[0_0_15px_rgba(52,211,153,0.6)] animate-pulse">
+                  2000
+                </h2>
+              </div>
+            </motion.div>
+
+            <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl w-full mb-12">
+              <motion.div 
+                whileHover={{ scale: 1.05 }}
+                className="bg-zinc-900/40 backdrop-blur-md p-6 rounded-2xl border border-white/10 shadow-2xl"
+              >
+                <Shield className="w-8 h-8 text-emerald-400 mb-4 mx-auto" />
+                <h3 className="text-lg font-black text-white mb-2 italic">THE MISSION</h3>
+                <p className="text-xs text-zinc-400 uppercase tracking-wider">Infiltrate the farm-rodent complex and eliminate the space guinea pig threat.</p>
+              </motion.div>
+              <motion.div 
+                whileHover={{ scale: 1.05 }}
+                className="bg-zinc-900/40 backdrop-blur-md p-6 rounded-2xl border border-white/10 shadow-2xl"
+              >
+                <Target className="w-8 h-8 text-red-500 mb-4 mx-auto" />
+                <h3 className="text-lg font-black text-white mb-2 italic">THE ENEMIES</h3>
+                <p className="text-xs text-zinc-400 uppercase tracking-wider">Mutated rabbits and the ultimate Mechanical Pig-Ship Boss await.</p>
+              </motion.div>
+              <motion.div 
+                whileHover={{ scale: 1.05 }}
+                className="bg-zinc-900/40 backdrop-blur-md p-6 rounded-2xl border border-white/10 shadow-2xl"
+              >
+                <Play className="w-8 h-8 text-blue-400 mb-4 mx-auto" />
+                <h3 className="text-lg font-black text-white mb-2 italic">CONTROLS</h3>
+                <p className="text-xs text-zinc-400 uppercase tracking-wider">WASD to move, SPACE to jump, F to fire. Switch boxes change your form.</p>
+              </motion.div>
+            </div>
+
+            <motion.button
+              whileHover={{ scale: 1.1, boxShadow: "0 0 50px rgba(16,185,129,0.6)" }}
+              whileTap={{ scale: 0.95 }}
+              onClick={startGame}
+              className="relative z-10 px-16 py-8 bg-emerald-600 text-white rounded-full text-3xl font-black uppercase tracking-[0.2em] italic transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] border-b-4 border-emerald-800"
+            >
+              Start Mission
+            </motion.button>
           </motion.div>
         )}
 
